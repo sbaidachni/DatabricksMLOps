@@ -1,0 +1,10 @@
+name: Scoring Pipeline
+
+conda_env: scoring_env.yaml
+
+entry_points:
+  main:
+    parameters:
+      training_experiment: {type: string}
+      model_name: {type: string, default: model}
+    command: "python score.py {training_experiment} {model_name}"

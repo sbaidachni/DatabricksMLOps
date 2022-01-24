@@ -1,0 +1,9 @@
+name: Training Pipeline
+
+conda_env: training_env.yaml
+
+entry_points:
+  main:
+    parameters:
+      model_name: {type: string, default: model}
+    command: "python train.py {model_name}"

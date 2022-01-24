@@ -1,0 +1,49 @@
+pr: none
+trigger:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - mlflow_hooks/*
+
+pool: 
+  vmImage: 'ubuntu-latest'
+
+variables:
+# The variable group should contain
+# DATABRICKS_HOST: databricks https URL
+# DATABRICKS_TOKEN: a personal token to get access to the databricks
+- group: mlops-vg
+
+steps:
+- task: UsePythonVersion@0
+  displayName: 'Use Python 3.x'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      pip install --upgrade pip 
+      pip install --upgrade databricks-cli
+  displayName: 'Install Packages'
+
+- task: Bash@3
+  displayName: Login Databricks CLI
+  inputs:
+    targetType: "inline"
+    script: |
+      databricks configure --token << ANSWERS
+      $(DATABRICKS_HOST)
+      $(DATABRICKS_TOKEN)
+      ANSWERS
+
+- task: Bash@3
+  displayName: Sync notebook folders
+  inputs:
+    targetType: 'inline'
+    script: |
+      databricks workspace ls /Shared/mlflow_hooks 
+      databricks workspace rm /Shared/mlflow_hooks -r 
+      databricks workspace mkdirs /Shared/mlflow_hooks
+      databricks workspace import_dir '$(Build.SourcesDirectory)/mlflow_hooks' /Shared/mlflow_hooks 

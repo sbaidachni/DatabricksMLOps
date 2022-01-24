@@ -1,0 +1,76 @@
+pr: none
+trigger:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - libs/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: mlops-vg
+
+steps:
+- task: UsePythonVersion@0
+  displayName: 'Use Python 3.x'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      pip install --upgrade pip
+      pip install --upgrade databricks-cli
+      pip install wheel
+      pip install setuptools
+  displayName: 'Install Packages'
+
+- task: Bash@3
+  displayName: Login Databricks CLI
+  inputs:
+    targetType: "inline"
+    script: |
+      databricks configure --token << ANSWERS
+      $(DATABRICKS_HOST)
+      $(DATABRICKS_TOKEN)
+      ANSWERS
+
+- task: Bash@3
+  displayName: Prepare wheel file(s)
+  inputs:
+    workingDirectory: $(Build.SourcesDirectory)/libs
+    targetType: 'inline'
+    script: |
+      for dir in */; do
+        cd $dir
+        python setup.py bdist_wheel
+        cd ..
+      done
+
+- task: Bash@3
+  inputs:
+    workingDirectory: $(Build.SourcesDirectory)/libs/
+    targetType: 'inline'
+    script: |
+      for dir in */; do
+        dir=${dir%/}
+        WHL_FILE=$(ls $dir/dist)
+        echo "WHEEL FILE NAME: $WHL_FILE"
+        dbfs cp $(Build.SourcesDirectory)/libs/$dir/dist/$WHL_FILE dbfs:/master/libs/$WHL_FILE --overwrite
+        db_cluster_check () {
+          RUNNING_DB_CLUSTER=$(databricks clusters list | grep $(CLUSTER_ID))
+          if [[ $RUNNING_DB_CLUSTER == *"RUNNING"* ]]; then
+            echo "Cluster is actively running. Installing $WHL_FILE"
+            databricks libraries install --cluster-id $(CLUSTER_ID) --whl dbfs:/master/libs/$WHL_FILE
+          else
+            echo "Cluster is terminated. Attempting to start."
+            databricks clusters start --cluster-id $(CLUSTER_ID)
+            sleep 30
+            db_cluster_check
+          fi
+        }
+        db_cluster_check
+      done
+  displayName: 'Copy wheel file to dbfs and install it'

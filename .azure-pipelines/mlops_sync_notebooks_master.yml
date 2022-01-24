@@ -1,0 +1,60 @@
+pr: none
+trigger:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - notebooks/*
+    - projects/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+# The variable group should contain
+# DATABRICKS_HOST: databricks https URL
+# DATABRICKS_TOKEN: a personal token to get access to the databricks
+- group: mlops-vg-pr
+
+steps:
+- task: UsePythonVersion@0
+  displayName: 'Use Python 3.x'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      pip install --upgrade pip
+      pip install --upgrade databricks-cli
+  displayName: 'Install Packages'
+
+- task: Bash@3
+  displayName: Login Databricks CLI
+  inputs:
+    targetType: "inline"
+    script: |
+      databricks configure --token << ANSWERS
+      $(DATABRICKS_HOST)
+      $(DATABRICKS_TOKEN)
+      ANSWERS
+
+- task: Bash@3
+  displayName: Sync notebook folders
+  inputs:
+    targetType: 'inline'
+    script: |
+      databricks workspace ls $(MASTER_BRANCH_SYNC_DIRECTORY)/notebooks
+      databricks workspace rm $(MASTER_BRANCH_SYNC_DIRECTORY)/notebooks -r
+      databricks workspace mkdirs $(MASTER_BRANCH_SYNC_DIRECTORY)/notebooks
+      databricks workspace import_dir '$(Build.SourcesDirectory)/notebooks' $(MASTER_BRANCH_SYNC_DIRECTORY)/notebooks
+
+- task: Bash@3
+  displayName: Sync projects folders
+  inputs:
+    targetType: 'inline'
+    script: |
+      databricks workspace ls $(MASTER_BRANCH_SYNC_DIRECTORY)/projects
+      databricks workspace rm $(MASTER_BRANCH_SYNC_DIRECTORY)/projects -r
+      databricks workspace mkdirs $(MASTER_BRANCH_SYNC_DIRECTORY)/projects
+      databricks workspace import_dir '$(Build.SourcesDirectory)/projects' $(MASTER_BRANCH_SYNC_DIRECTORY)/projects
