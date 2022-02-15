@@ -1,0 +1,12 @@
+name: training
+channels:
+  - defaults
+  - anaconda
+  - conda-forge
+dependencies:
+  - python=3.7
+  - scikit-learn
+  - pyspark
+  - pip:
+    - mlflow
+    - PyArrow

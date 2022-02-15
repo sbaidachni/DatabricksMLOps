@@ -1,0 +1,94 @@
+trigger: none
+pr:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - projects/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+# The variable group should contain
+# DATABRICKS_HOST: databricks https URL
+# DATABRICKS_TOKEN: a personal token to get access to the databricks
+- group: mlops-vg-pr
+
+steps:
+- task: UsePythonVersion@0
+  displayName: 'Use Python 3.x'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      pip install --upgrade pip
+      pip install --upgrade databricks-cli
+      pip install mlflow
+      pip install python-dotenv
+      pip install wheel
+      pip install setuptools
+  displayName: 'Install Packages'
+
+- task: Bash@3
+  displayName: Prepare wheel file
+  inputs:
+    workingDirectory: $(Build.SourcesDirectory)/libs
+    targetType: 'inline'
+    script: |
+      for dir in */; do
+        cd $dir
+        python setup.py bdist_wheel
+        cd ..
+      done
+
+- task: Bash@3
+  displayName: Login Databricks CLI
+  inputs:
+    targetType: "inline"
+    script: |
+      databricks configure --token << ANSWERS
+      $(DATABRICKS_HOST)
+      $(DATABRICKS_TOKEN)
+      ANSWERS
+
+- task: Bash@3
+  displayName: Copy wheel file to dbfs
+  inputs:
+    workingDirectory: $(Build.SourcesDirectory)
+    targetType: 'inline'
+    script: |
+       python libs/deploy_wheel.py
+  env:
+    DATABRICKS_HOST: '$(DATABRICKS_HOST)'
+    DATABRICKS_TOKEN: '$(DATABRICKS_TOKEN)'
+    USER: '$(Build.RequestedFor)'
+    PROJECT_FOLDER: '$(Build.SourcesDirectory)'
+
+- task: Bash@3
+  displayName: Execute Example Training Project
+  inputs:
+    workingDirectory: $(Build.SourcesDirectory)
+    targetType: 'inline'
+    script: |
+      export MLFLOW_TRACKING_URI=databricks
+      python -m mlflow_triggers.start_training_devops
+  env:
+    DATABRICKS_HOST: '$(DATABRICKS_HOST)'
+    DATABRICKS_TOKEN: '$(DATABRICKS_TOKEN)'
+    USER: '$(Build.RequestedFor)'
+
+- task: Bash@3
+  displayName: Execute Example Scoring Project
+  inputs:
+    workingDirectory: $(Build.SourcesDirectory)
+    targetType: 'inline'
+    script: |
+      export MLFLOW_TRACKING_URI=databricks
+      python -m mlflow_triggers.start_scoring_devops
+  env:
+    DATABRICKS_HOST: '$(DATABRICKS_HOST)'
+    DATABRICKS_TOKEN: '$(DATABRICKS_TOKEN)'
+    USER: '$(Build.RequestedFor)'
