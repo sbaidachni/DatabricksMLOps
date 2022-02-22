@@ -112,7 +112,7 @@ It will help us to have several runs on the same branch under the same experimen
 
 Let's modify our initial diagram having in mind that we are using MLFlow and Databricks:
 
-![MLOps on Databricks Final](assets/mlops_architecture/mlops_final_Databricks.png)
+![MLOps on Databricks Final](assets/mlops_architecture/mlops_final_databricks.png)
 
 ## Some Notes about Local Development ##
 
